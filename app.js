@@ -113,3 +113,26 @@ document.getElementById("importInput").onchange=e=>{const f=e.target.files[0];if
 document.getElementById("resetBtn").onclick=()=>{if(confirm("Wirklich alle Daten löschen?")){localStorage.removeItem("mfc_state");location.reload()}};
 applyTheme();loadSettings();setupWeekSelector();renderToday();renderHistory();
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+
+// Version 2 daily tracking
+state.daily=state.daily||{};
+state.settings={waterGoal:2500,proteinGoal:160,stepsGoal:8000,bikeGoal:45,sleepGoal:7,...state.settings};
+function dayLog(){const d=today();state.daily[d]=state.daily[d]||{water:0,proteinEntries:[],bikeMinutes:0,steps:0,sleep:0,workoutDone:{}};return state.daily[d]}
+function pct(v,g){return g?Math.min(100,Math.round(v/g*100)):0}
+const oldRenderToday=renderToday;
+renderToday=function(){
+ oldRenderToday(); const log=dayLog(); const p=state.pain[today()]??0; const w=workoutFor(today(),p); const box=document.getElementById('todayWorkout'); box.innerHTML=''; let total=0,done=0;
+ w.forEach((x,i)=>{total+=x.m;const key=(x.n+'-'+i);const ok=!!log.workoutDone[key];if(ok)done++;box.innerHTML+=`<div class="workout-item ${ok?'task-done':''}"><div><h4>${x.n}</h4><p>${x.d}</p></div><button class="task-btn" data-task="${key}">${ok?'✓ Erledigt':'Abschließen'}</button></div>`});
+ document.getElementById('durationBadge').textContent=`ca. ${total} Min`;document.getElementById('trainingProgressText').textContent=`${done}/${w.length} erledigt`;document.getElementById('trainingProgressBar').style.width=pct(done,w.length)+'%';
+ document.getElementById('waterGoalText').textContent=state.settings.waterGoal.toLocaleString('de-DE')+' ml';document.getElementById('waterTotal').textContent=log.water.toLocaleString('de-DE')+' ml';document.getElementById('waterBar').style.width=pct(log.water,state.settings.waterGoal)+'%';
+ const protein=log.proteinEntries.reduce((a,b)=>a+Number(b.value||0),0);document.getElementById('proteinGoalText').textContent=state.settings.proteinGoal+' g';document.getElementById('proteinTotal').textContent=protein+' g';document.getElementById('proteinBar').style.width=pct(protein,state.settings.proteinGoal)+'%';document.getElementById('proteinEntries').innerHTML=log.proteinEntries.map((e,i)=>`<span class="entry-chip">${e.value} g <button data-del-protein="${i}">×</button></span>`).join('');
+ document.getElementById('bikeMinutes').value=log.bikeMinutes||'';document.getElementById('stepsInput').value=log.steps||'';const move=Math.round((pct(log.bikeMinutes,state.settings.bikeGoal)+pct(log.steps,state.settings.stepsGoal))/2);document.getElementById('movementScore').textContent=move+' %';document.getElementById('movementBar').style.width=move+'%';
+ document.getElementById('sleepGoalText').textContent=state.settings.sleepGoal+' Stunden';document.getElementById('sleepTotal').textContent=(log.sleep||0)+' h';document.getElementById('sleepBar').style.width=pct(log.sleep,state.settings.sleepGoal)+'%';document.getElementById('sleepInput').value=log.sleep||'';save();
+}
+document.getElementById('todayWorkout').onclick=e=>{const k=e.target.dataset.task;if(!k)return;const l=dayLog();l.workoutDone[k]=!l.workoutDone[k];save();renderToday()};
+document.querySelectorAll('[data-water]').forEach(b=>b.onclick=()=>{const l=dayLog();l.water=Math.max(0,(l.water||0)+Number(b.dataset.water));save();renderToday()});
+document.getElementById('addProtein').onclick=()=>{const v=parseFloat(document.getElementById('proteinInput').value);if(!(v>0))return;dayLog().proteinEntries.push({value:v});document.getElementById('proteinInput').value='';save();renderToday()};
+document.getElementById('proteinEntries').onclick=e=>{const i=e.target.dataset.delProtein;if(i===undefined)return;dayLog().proteinEntries.splice(Number(i),1);save();renderToday()};
+document.getElementById('saveMovement').onclick=()=>{const l=dayLog();l.bikeMinutes=Math.max(0,parseInt(document.getElementById('bikeMinutes').value||0));l.steps=Math.max(0,parseInt(document.getElementById('stepsInput').value||0));save();renderToday()};
+document.getElementById('saveSleep').onclick=()=>{dayLog().sleep=Math.max(0,parseFloat(document.getElementById('sleepInput').value||0));save();renderToday()};
+renderToday();
